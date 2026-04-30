@@ -604,7 +604,7 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/drippygames
   .then(async () => {
     console.log('[DB] MongoDB connected');
     await engine.init();
-    server.listen(PORT, () => console.log(`[Server] Running on http://localhost:${PORT}`));
+   server.listen(PORT, '0.0.0.0', () => console.log(`[Server] Running on http://0.0.0.0:${PORT}`))
   })
   .catch(err => {
     console.error('[DB] Connection failed:', err.message);
