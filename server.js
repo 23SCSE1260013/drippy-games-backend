@@ -256,11 +256,29 @@ const auth = async (req, res, next) => {
 const app    = express();
 const server = http.createServer(app);
 
+const ALLOWED_ORIGINS = [
+  'https://drippygamesv2.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+
 const io = new Server(server, {
-  cors: { origin: process.env.FRONTEND_URL || '*', methods: ['GET', 'POST'] }
+  cors: { origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'], credentials: true }
 });
 
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static('../frontend'));
 
@@ -604,7 +622,7 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/drippygames
   .then(async () => {
     console.log('[DB] MongoDB connected');
     await engine.init();
-   server.listen(PORT, '0.0.0.0', () => console.log(`[Server] Running on http://0.0.0.0:${PORT}`))
+    server.listen(PORT, () => console.log(`[Server] Running on http://localhost:${PORT}`));
   })
   .catch(err => {
     console.error('[DB] Connection failed:', err.message);
