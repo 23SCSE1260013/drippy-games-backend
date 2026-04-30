@@ -397,20 +397,28 @@ walletRouter.get('/transactions', auth, async (req, res) => {
 // POST /api/wallet/deposit
 walletRouter.post('/deposit', auth, [
   body('amount').isFloat({ min: 100, max: 100000 }).withMessage('Deposit must be ₹100 - ₹1,00,000'),
-  body('method').isIn(['upi','card','netbanking']).withMessage('Invalid payment method')
+  body('utr').optional().trim(),
+  body('method').optional().isIn(['upi','card','netbanking'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   try {
-    const { amount, method } = req.body;
+    const { amount, method = 'upi', utr } = req.body;
+    if (!utr || utr.trim().length < 8)
+      return res.status(400).json({ error: 'Valid UTR number is required' });
+
     const user = await User.findById(req.user._id);
     const reference = 'DEP' + Date.now();
-    user.balance += parseFloat(amount);
-    user.addTransaction('deposit', parseFloat(amount), 'completed',
-      `Deposit via ${method.toUpperCase()}`, { reference, method });
+
+    // Balance NOT credited yet — pending admin UTR verification
+    user.addTransaction('deposit', parseFloat(amount), 'pending',
+      `UPI deposit pending UTR verification (UTR: ${utr})`, { reference, method, utr });
     await user.save();
-    res.json({ success: true, reference, newBalance: user.balance, message: `₹${amount} deposited successfully` });
+
+    console.log(`[Deposit] ${user.username} submitted ₹${amount} | UTR: ${utr}`);
+    res.json({ success: true, reference, newBalance: user.balance,
+      message: `₹${amount} deposit submitted! We\'ll verify UTR ${utr} and credit within 30 mins.` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -419,27 +427,46 @@ walletRouter.post('/deposit', auth, [
 
 // POST /api/wallet/withdraw
 walletRouter.post('/withdraw', auth, [
-  body('amount').isFloat({ min: 100, max: 100000 }).withMessage('Withdrawal must be ₹100 - ₹1,00,000')
+  body('amount').isFloat({ min: 100, max: 100000 }).withMessage('Withdrawal must be ₹100 - ₹1,00,000'),
+  body('method').optional().isIn(['upi','bank']),
+  body('upiId').optional().trim()
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   try {
-    const { amount } = req.body;
+    const { amount, method = 'bank', upiId } = req.body;
     const user = await User.findById(req.user._id);
-    if (!user.bankDetails?.accountNumber)
-      return res.status(400).json({ error: 'Please add bank details before withdrawing' });
+
     if (user.balance < parseFloat(amount))
       return res.status(400).json({ error: 'Insufficient balance' });
 
-    const reference = 'WD' + Date.now();
-    user.balance -= parseFloat(amount);
-    user.addTransaction('withdrawal', parseFloat(amount), 'processing',
-      `Withdrawal to ${user.bankDetails.bankName} ****${user.bankDetails.accountNumber.slice(-4)}`,
-      { reference, bankDetails: { ...user.bankDetails.toObject() } });
-    await user.save();
-    res.json({ success: true, reference, newBalance: user.balance,
-      message: `₹${amount} withdrawal initiated. Processing in 1-3 business days.` });
+    if (method === 'upi') {
+      if (!upiId || !upiId.includes('@'))
+        return res.status(400).json({ error: 'Valid UPI ID required (e.g. name@upi)' });
+
+      const reference = 'WD' + Date.now();
+      user.balance -= parseFloat(amount);
+      user.addTransaction('withdrawal', parseFloat(amount), 'processing',
+        `UPI withdrawal to ${upiId}`, { reference, method: 'upi', upiId });
+      await user.save();
+      console.log(`[Withdraw] ${user.username} ₹${amount} -> UPI: ${upiId}`);
+      res.json({ success: true, reference, newBalance: user.balance,
+        message: `₹${amount} withdrawal to ${upiId} initiated. Processing in 1-24 hrs.` });
+    } else {
+      if (!user.bankDetails?.accountNumber)
+        return res.status(400).json({ error: 'Please add bank details before withdrawing' });
+
+      const reference = 'WD' + Date.now();
+      user.balance -= parseFloat(amount);
+      user.addTransaction('withdrawal', parseFloat(amount), 'processing',
+        `Bank withdrawal to ${user.bankDetails.bankName} ****${user.bankDetails.accountNumber.slice(-4)}`,
+        { reference, method: 'bank', bankDetails: { ...user.bankDetails.toObject() } });
+      await user.save();
+      console.log(`[Withdraw] ${user.username} ₹${amount} -> Bank: ****${user.bankDetails.accountNumber.slice(-4)}`);
+      res.json({ success: true, reference, newBalance: user.balance,
+        message: `₹${amount} withdrawal initiated. Processing in 1-3 business days.` });
+    }
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
