@@ -105,11 +105,11 @@ const Round = mongoose.model('Round', roundSchema);
 
 function generateCrashPoint() {
   const r = Math.random();
-  if (r < 0.35) return parseFloat((1.1 + Math.random() * 0.4).toFixed(2));
-  if (r < 0.65) return parseFloat((1.5 + Math.random() * 1.5).toFixed(2));
-  if (r < 0.85) return parseFloat((3   + Math.random() * 5).toFixed(2));
-  if (r < 0.95) return parseFloat((8   + Math.random() * 15).toFixed(2));
-  return parseFloat((23 + Math.random() * 77).toFixed(2));
+  if (r < 0.55) return parseFloat((1.00 + Math.random() * 0.10).toFixed(2)); // 55% crash between 1.00–1.10
+  if (r < 0.80) return parseFloat((1.10 + Math.random() * 0.15).toFixed(2)); // 25% crash between 1.10–1.25
+  if (r < 0.92) return parseFloat((1.25 + Math.random() * 0.75).toFixed(2)); // 12% crash between 1.25–2.00
+  if (r < 0.97) return parseFloat((2.00 + Math.random() * 3.00).toFixed(2)); //  5% crash between 2.00–5.00
+  return parseFloat((5.00 + Math.random() * 15).toFixed(2));                 //  3% crash between 5.00–20.00
 }
 
 function calcMultiplier(elapsedMs) {
