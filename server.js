@@ -427,7 +427,7 @@ walletRouter.post('/deposit', auth, [
 
 // POST /api/wallet/withdraw
 walletRouter.post('/withdraw', auth, [
-  body('amount').isFloat({ min: 100, max: 100000 }).withMessage('Withdrawal must be ₹100 - ₹1,00,000'),
+  body('amount').isFloat({ min: 1100, max: 100000 }).withMessage('Withdrawal must be ₹1,100 - ₹1,00,000'),
   body('method').optional().isIn(['upi','bank']),
   body('upiId').optional().trim()
 ], async (req, res) => {
